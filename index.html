@@ -4,411 +4,125 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Browser Remote</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  :root {
-    --bg: #0a0a0f;
-    --surface: #13131a;
-    --surface2: #1c1c26;
-    --accent: #7c6fff;
-    --accent2: #b8aeff;
-    --text: #e4e4f0;
-    --muted: #5a5a72;
-    --green: #3dd68c;
-    --red: #ff6b6b;
-    --border: rgba(255,255,255,0.06);
-    --radius: 14px;
-  }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    user-select: none;
-  }
-
-  /* ── Setup screen ── */
-  #setup-screen {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 28px 24px;
-    gap: 0;
-  }
-  .setup-logo {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    margin-bottom: 6px;
-  }
-  .setup-logo em { color: var(--accent2); font-style: normal; }
-  .setup-sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
-
-  .setup-card {
-    width: 100%;
-    max-width: 340px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 22px 20px;
-  }
-  .setup-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
-  .setup-input {
-    width: 100%;
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: 4px;
-    text-align: center;
-    outline: none;
-    margin-bottom: 14px;
-  }
-  .setup-input:focus { border-color: var(--accent); }
-  .setup-input::placeholder { font-size: 15px; letter-spacing: 1px; font-weight: 400; color: var(--muted); }
-  .setup-btn {
-    width: 100%;
-    padding: 15px;
-    border-radius: 12px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 16px;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-    letter-spacing: -0.3px;
-  }
-  .setup-btn:active { background: var(--accent2); color: #000; }
-
-  .setup-hint {
-    margin-top: 18px;
-    font-size: 12px;
-    color: var(--muted);
-    text-align: center;
-    line-height: 1.7;
-    max-width: 300px;
-  }
-  .setup-hint strong { color: var(--accent2); }
-
-  /* ── Remote screen ── */
-  #remote-screen { flex: 1; display: none; flex-direction: column; overflow: hidden; }
-
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px 10px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .hdr-left { display: flex; align-items: center; gap: 8px; }
-  .back-btn { font-size: 13px; color: var(--muted); cursor: pointer; padding: 4px 0; }
-  .ch-badge {
-    padding: 3px 10px;
-    background: var(--surface2);
-    border-radius: 99px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--accent2);
-    letter-spacing: 1px;
-    border: 1px solid var(--border);
-  }
-  .conn-badge {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 11px; color: var(--muted);
-  }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: all 0.3s; }
-  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
-
-  /* ── Tabs ── */
-  .tabs {
-    display: flex;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .tab {
-    flex: 1; padding: 9px 4px;
-    text-align: center; font-size: 11px; font-weight: 600;
-    color: var(--muted); cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s; letter-spacing: 0.3px;
-  }
-  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
-
-  .panel { display: none; flex: 1; flex-direction: column; overflow-y: auto; }
-  .panel.active { display: flex; }
-
-  /* ── Slide remote panel ── */
-  .slide-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    gap: 12px;
-  }
-
-  .big-nav {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    flex: 1;
-  }
-  .nav-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-radius: var(--radius);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: all 0.1s;
-    padding: 20px 10px;
-    touch-action: manipulation;
-  }
-  .nav-btn:active { background: var(--accent); border-color: var(--accent); transform: scale(0.96); }
-  .nav-btn .nav-icon { font-size: 32px; }
-  .nav-btn .nav-label { font-size: 12px; font-weight: 600; color: var(--muted); }
-  .nav-btn:active .nav-label { color: rgba(255,255,255,0.8); }
-
-  .nav-btn.full-width {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    gap: 12px;
-    padding: 16px 20px;
-  }
-  .nav-btn.full-width .nav-icon { font-size: 22px; }
-
-  /* ── Scroll panel ── */
-  .scroll-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    gap: 10px;
-  }
-  .scroll-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .scr-btn {
-    padding: 22px 10px;
-    border-radius: var(--radius);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.1s;
-    touch-action: manipulation;
-  }
-  .scr-btn:active { background: var(--accent); border-color: var(--accent); transform: scale(0.96); }
-  .scr-btn .s-icon { font-size: 28px; display: block; margin-bottom: 6px; }
-  .scr-btn .s-label { font-size: 12px; font-weight: 600; color: var(--muted); }
-
-  #scrollpad {
-    background: var(--surface);
-    border: 1px dashed rgba(124,111,255,0.3);
-    border-radius: var(--radius);
-    height: 130px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: var(--muted);
-    touch-action: none;
-    position: relative;
-    overflow: hidden;
-  }
-  #scrollpad.active-scroll { border-color: var(--accent); background: rgba(124,111,255,0.05); }
-
-  /* ── Keys panel ── */
-  .keys-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 14px;
-    gap: 10px;
-    overflow-y: auto;
-  }
-  .type-row { display: flex; gap: 8px; }
-  .type-input {
-    flex: 1; padding: 11px 14px;
-    border-radius: 12px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text); font-size: 15px; outline: none;
-  }
-  .type-input:focus { border-color: var(--accent); }
-  .type-send {
-    padding: 11px 16px; border-radius: 12px;
-    background: var(--accent); color: #fff;
-    font-size: 14px; font-weight: 700;
-    cursor: pointer; border: none;
-    touch-action: manipulation;
-  }
-  .type-send:active { background: var(--accent2); color: #000; }
-
-  .kb-section-label {
-    font-size: 10px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.8px;
-    padding: 4px 0 2px;
-  }
-  .kb-row { display: flex; gap: 7px; justify-content: center; }
-  .kbtn {
-    flex: 1; min-width: 40px;
-    padding: 11px 6px;
-    border-radius: 10px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text); font-size: 12px; font-weight: 600;
-    cursor: pointer; text-align: center;
-    touch-action: manipulation; transition: all 0.1s;
-  }
-  .kbtn:active { background: var(--accent); transform: scale(0.93); }
-  .kbtn.accent { background: rgba(124,111,255,0.2); border-color: rgba(124,111,255,0.3); color: var(--accent2); }
-  .kbtn.accent:active { background: var(--accent); color: #fff; }
-  .kbtn.wide { flex: 2; }
-
-  /* ── Toast ── */
-  #toast {
-    position: fixed; bottom: 20px; left: 50%;
-    transform: translateX(-50%) translateY(70px);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 9px 18px;
-    border-radius: 99px;
-    font-size: 12px; font-weight: 600;
-    transition: transform 0.25s ease;
-    pointer-events: none; z-index: 999;
-    white-space: nowrap;
-  }
-  #toast.show { transform: translateX(-50%) translateY(0); }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{--bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c26;--accent:#7c6fff;--accent2:#b8aeff;--text:#e4e4f0;--muted:#5a5a72;--green:#3dd68c;--red:#ff6b6b;--border:rgba(255,255,255,0.06);--radius:14px}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;min-height:100dvh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+  #setup-screen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px}
+  .setup-logo{font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:6px}
+  .setup-logo em{color:var(--accent2);font-style:normal}
+  .setup-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
+  .setup-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px 20px}
+  .setup-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+  .setup-input{width:100%;padding:14px 16px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:22px;font-weight:700;letter-spacing:4px;text-align:center;outline:none;margin-bottom:14px}
+  .setup-input:focus{border-color:var(--accent)}
+  .setup-input::placeholder{font-size:15px;letter-spacing:1px;font-weight:400;color:var(--muted)}
+  .setup-btn{width:100%;padding:15px;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer}
+  .setup-btn:active{background:var(--accent2);color:#000}
+  .setup-hint{margin-top:18px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;max-width:300px}
+  .setup-hint strong{color:var(--accent2)}
+  #remote-screen{flex:1;display:none;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+  .hdr-left{display:flex;align-items:center;gap:8px}
+  .back-btn{font-size:13px;color:var(--muted);cursor:pointer;padding:4px 0}
+  .ch-badge{padding:3px 10px;background:var(--surface2);border-radius:99px;font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:1px;border:1px solid var(--border)}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--red);transition:all .3s}
+  .dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+  .tab{flex:1;padding:9px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;letter-spacing:.3px}
+  .tab.active{color:var(--accent2);border-bottom-color:var(--accent2)}
+  .panel{display:none;flex:1;flex-direction:column;overflow-y:auto}
+  .panel.active{display:flex}
+  .slide-panel{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px}
+  .big-nav{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
+  .nav-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .1s;padding:20px 10px;touch-action:manipulation}
+  .nav-btn:active{background:var(--accent);border-color:var(--accent);transform:scale(.96)}
+  .nav-btn .nav-icon{font-size:32px}
+  .nav-btn .nav-label{font-size:12px;font-weight:600;color:var(--muted)}
+  .nav-btn:active .nav-label{color:rgba(255,255,255,.8)}
+  .scroll-panel{flex:1;display:flex;flex-direction:column;padding:16px;gap:10px}
+  .scroll-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .scr-btn{padding:22px 10px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);text-align:center;cursor:pointer;transition:all .1s;touch-action:manipulation}
+  .scr-btn:active{background:var(--accent);border-color:var(--accent);transform:scale(.96)}
+  .scr-btn .s-icon{font-size:28px;display:block;margin-bottom:6px}
+  .scr-btn .s-label{font-size:12px;font-weight:600;color:var(--muted)}
+  #scrollpad{background:var(--surface);border:1px dashed rgba(124,111,255,.3);border-radius:var(--radius);height:130px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);touch-action:none}
+  #scrollpad.active-scroll{border-color:var(--accent);background:rgba(124,111,255,.05)}
+  .keys-panel{flex:1;display:flex;flex-direction:column;padding:14px;gap:10px;overflow-y:auto}
+  .type-row{display:flex;gap:8px}
+  .type-input{flex:1;padding:11px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:15px;outline:none}
+  .type-input:focus{border-color:var(--accent)}
+  .type-send{padding:11px 16px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;border:none;touch-action:manipulation}
+  .type-send:active{background:var(--accent2);color:#000}
+  .kb-section-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:4px 0 2px}
+  .kb-row{display:flex;gap:7px;justify-content:center}
+  .kbtn{flex:1;min-width:40px;padding:11px 6px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;text-align:center;touch-action:manipulation;transition:all .1s}
+  .kbtn:active{background:var(--accent);transform:scale(.93)}
+  .kbtn.accent{background:rgba(124,111,255,.2);border-color:rgba(124,111,255,.3);color:var(--accent2)}
+  .kbtn.accent:active{background:var(--accent);color:#fff}
+  .kbtn.wide{flex:2}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 18px;border-radius:99px;font-size:12px;font-weight:600;transition:transform .25s ease;pointer-events:none;z-index:999;white-space:nowrap}
+  #toast.show{transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
-
-<!-- ── Setup Screen ── -->
 <div id="setup-screen">
   <div class="setup-logo">Browser<em>Remote</em></div>
   <div class="setup-sub">Control your laptop browser from your phone</div>
-
   <div class="setup-card">
     <div class="setup-label">Enter channel code</div>
     <input class="setup-input" id="ch-input" type="text" placeholder="e.g. myroom42" maxlength="32" autocomplete="off" autocorrect="off" spellcheck="false">
     <button class="setup-btn" id="join-btn">Connect →</button>
   </div>
-
-  <div class="setup-hint">
-    Use the same code you entered on your <strong>laptop receiver tab</strong>.<br>
-    Both devices must be connected to the internet.
-  </div>
+  <div class="setup-hint">Same code on your <strong>laptop receiver tab</strong>.<br>Both devices need internet — no Wi-Fi pairing needed.</div>
 </div>
-
-<!-- ── Remote Screen ── -->
 <div id="remote-screen">
   <header>
     <div class="hdr-left">
       <div class="back-btn" id="back-btn">← Back</div>
       <div class="ch-badge" id="ch-display"></div>
     </div>
-    <div class="conn-badge">
-      <div class="dot" id="dot"></div>
-      <span id="conn-text">connecting</span>
-    </div>
+    <div class="conn-badge"><div class="dot" id="dot"></div><span id="conn-text">connecting</span></div>
   </header>
-
   <div class="tabs">
     <div class="tab active" data-tab="slides">📊 Slides</div>
     <div class="tab" data-tab="scroll">↕ Scroll</div>
     <div class="tab" data-tab="keys">⌨ Keys</div>
   </div>
-
-  <!-- Slides Panel -->
   <div class="panel active" id="panel-slides">
     <div class="slide-panel">
       <div class="big-nav">
-        <div class="nav-btn" data-action="prev_slide">
-          <span class="nav-icon">⬅️</span>
-          <span class="nav-label">Prev slide</span>
-        </div>
-        <div class="nav-btn" data-action="next_slide">
-          <span class="nav-icon">➡️</span>
-          <span class="nav-label">Next slide</span>
-        </div>
-        <div class="nav-btn" data-action='{"action":"key","key":"F5"}'>
-          <span class="nav-icon">▶️</span>
-          <span class="nav-label">Start show</span>
-        </div>
-        <div class="nav-btn" data-action='{"action":"key","key":"Escape"}'>
-          <span class="nav-icon">⏹️</span>
-          <span class="nav-label">End show</span>
-        </div>
-        <div class="nav-btn" data-action="fullscreen" style="grid-column:1/-1;flex-direction:row;gap:12px;padding:14px 20px">
-          <span class="nav-icon" style="font-size:22px">⛶</span>
-          <span class="nav-label" style="font-size:13px">Toggle fullscreen</span>
-        </div>
-        <div class="nav-btn" data-action="nav_back" style="">
-          <span class="nav-icon">🔙</span>
-          <span class="nav-label">Browser back</span>
-        </div>
-        <div class="nav-btn" data-action="reload">
-          <span class="nav-icon">🔄</span>
-          <span class="nav-label">Reload page</span>
-        </div>
+        <div class="nav-btn" data-action="prev_slide"><span class="nav-icon">⬅️</span><span class="nav-label">Prev slide</span></div>
+        <div class="nav-btn" data-action="next_slide"><span class="nav-icon">➡️</span><span class="nav-label">Next slide</span></div>
+        <div class="nav-btn" data-action='{"action":"key","key":"F5"}'><span class="nav-icon">▶️</span><span class="nav-label">Start show</span></div>
+        <div class="nav-btn" data-action='{"action":"key","key":"Escape"}'><span class="nav-icon">⏹️</span><span class="nav-label">End show</span></div>
+        <div class="nav-btn" data-action="fullscreen" style="grid-column:1/-1;flex-direction:row;gap:12px;padding:14px 20px"><span class="nav-icon" style="font-size:22px">⛶</span><span class="nav-label" style="font-size:13px">Toggle fullscreen</span></div>
+        <div class="nav-btn" data-action="nav_back"><span class="nav-icon">🔙</span><span class="nav-label">Browser back</span></div>
+        <div class="nav-btn" data-action="reload"><span class="nav-icon">🔄</span><span class="nav-label">Reload page</span></div>
       </div>
     </div>
   </div>
-
-  <!-- Scroll Panel -->
   <div class="panel" id="panel-scroll">
     <div class="scroll-panel">
       <div class="scroll-grid">
-        <div class="scr-btn" data-action='{"action":"scroll_up","amount":300}'>
-          <span class="s-icon">⬆️</span>
-          <span class="s-label">Scroll up</span>
-        </div>
-        <div class="scr-btn" data-action='{"action":"scroll_down","amount":300}'>
-          <span class="s-icon">⬇️</span>
-          <span class="s-label">Scroll down</span>
-        </div>
-        <div class="scr-btn" data-action='{"action":"scroll_top"}'>
-          <span class="s-icon">⏫</span>
-          <span class="s-label">Top of page</span>
-        </div>
-        <div class="scr-btn" data-action='{"action":"scroll_bottom"}'>
-          <span class="s-icon">⏬</span>
-          <span class="s-label">Bottom</span>
-        </div>
+        <div class="scr-btn" data-action='{"action":"scroll_up","amount":300}'><span class="s-icon">⬆️</span><span class="s-label">Scroll up</span></div>
+        <div class="scr-btn" data-action='{"action":"scroll_down","amount":300}'><span class="s-icon">⬇️</span><span class="s-label">Scroll down</span></div>
+        <div class="scr-btn" data-action='{"action":"scroll_top"}'><span class="s-icon">⏫</span><span class="s-label">Top of page</span></div>
+        <div class="scr-btn" data-action='{"action":"scroll_bottom"}'><span class="s-icon">⏬</span><span class="s-label">Bottom</span></div>
       </div>
       <div id="scrollpad">☝️ Drag up/down to scroll</div>
     </div>
   </div>
-
-  <!-- Keys Panel -->
   <div class="panel" id="panel-keys">
     <div class="keys-panel">
       <div class="type-row">
         <input class="type-input" id="type-input" type="text" placeholder="Type text on laptop…">
         <button class="type-send" id="type-send">Send</button>
       </div>
-
       <div class="kb-section-label">Navigation</div>
-      <div class="kb-row">
-        <div class="kbtn" data-action='{"action":"key","key":"ArrowUp"}'>▲</div>
-      </div>
+      <div class="kb-row"><div class="kbtn" data-action='{"action":"key","key":"ArrowUp"}'>▲</div></div>
       <div class="kb-row">
         <div class="kbtn" data-action='{"action":"key","key":"ArrowLeft"}'>◀</div>
         <div class="kbtn" data-action='{"action":"key","key":"ArrowDown"}'>▼</div>
@@ -425,13 +139,12 @@
         <div class="kbtn" data-action='{"action":"key","key":"Home"}'>Home</div>
         <div class="kbtn" data-action='{"action":"key","key":"End"}'>End</div>
       </div>
-
       <div class="kb-section-label">Shortcuts</div>
       <div class="kb-row">
         <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","c"]}'>Copy</div>
         <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","v"]}'>Paste</div>
         <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","z"]}'>Undo</div>
-        <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","a"]}'>Select all</div>
+        <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","a"]}'>Sel all</div>
       </div>
       <div class="kb-row">
         <div class="kbtn accent" data-action='{"action":"hotkey","keys":["ctrl","f"]}'>Find</div>
@@ -440,144 +153,97 @@
         <div class="kbtn accent" data-action='{"action":"zoom_out"}'>Zoom −</div>
         <div class="kbtn accent" data-action='{"action":"zoom_reset"}'>Reset</div>
       </div>
-
       <div class="kb-section-label">Function keys</div>
       <div class="kb-row">
         <div class="kbtn" data-action='{"action":"key","key":"F1"}'>F1</div>
         <div class="kbtn" data-action='{"action":"key","key":"F2"}'>F2</div>
         <div class="kbtn" data-action='{"action":"key","key":"F3"}'>F3</div>
-        <div class="kbtn" data-action='{"action":"key","key":"F4"}'>F4</div>
         <div class="kbtn" data-action='{"action":"key","key":"F5"}'>F5</div>
         <div class="kbtn" data-action='{"action":"key","key":"F11"}'>F11</div>
       </div>
     </div>
   </div>
 </div>
-
 <div id="toast"></div>
-
 <script>
-const RELAY = 'wss://ws.piesocket.com/v3/';
-const API_KEY = 'oCdCMcMPQpENbe20gsLNMp';
-let ws = null, channel = '';
-
-// ── Setup ────────────────────────────────────────────────────────────────────
-const saved = localStorage.getItem('br_channel');
-if (saved) document.getElementById('ch-input').value = saved;
-
-document.getElementById('join-btn').addEventListener('click', joinChannel);
-document.getElementById('ch-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') joinChannel();
-});
-
-function joinChannel() {
-  channel = document.getElementById('ch-input').value.trim().replace(/\W/g, '');
-  if (!channel) { alert('Enter a channel code first.'); return; }
-  localStorage.setItem('br_channel', channel);
-  document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('remote-screen').style.display = 'flex';
-  document.getElementById('ch-display').textContent = channel;
-  connectWS();
+const BROKER='wss://broker.hivemq.com:8884/mqtt';
+let client=null, channel='';
+const saved=localStorage.getItem('br_channel');
+if(saved)document.getElementById('ch-input').value=saved;
+document.getElementById('join-btn').addEventListener('click',joinChannel);
+document.getElementById('ch-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinChannel();});
+function joinChannel(){
+  channel=document.getElementById('ch-input').value.trim().replace(/\W/g,'');
+  if(!channel){alert('Enter a channel code first.');return;}
+  localStorage.setItem('br_channel',channel);
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('remote-screen').style.display='flex';
+  document.getElementById('ch-display').textContent=channel;
+  connectMQTT();
 }
-
-document.getElementById('back-btn').addEventListener('click', () => {
-  if (ws) ws.close();
-  document.getElementById('remote-screen').style.display = 'none';
-  document.getElementById('setup-screen').style.display = 'flex';
+document.getElementById('back-btn').addEventListener('click',()=>{
+  if(client)client.end();
+  document.getElementById('remote-screen').style.display='none';
+  document.getElementById('setup-screen').style.display='flex';
 });
-
-// ── WebSocket ─────────────────────────────────────────────────────────────────
-function connectWS() {
-  const url = `${RELAY}browserremote_${channel}?api_key=${API_KEY}&notify_self=0`;
-  ws = new WebSocket(url);
-
-  ws.onopen = () => {
+function connectMQTT(){
+  const clientId='phone_'+Math.random().toString(36).slice(2,8);
+  client=mqtt.connect(BROKER,{clientId,clean:true,reconnectPeriod:3000});
+  client.on('connect',()=>{
     document.getElementById('dot').classList.add('on');
-    document.getElementById('conn-text').textContent = 'connected';
-    send({ action: 'ping', sender: 'phone' });
+    document.getElementById('conn-text').textContent='connected';
+    publish({action:'ping'});
     toast('✅ Connected!');
-  };
-  ws.onclose = () => {
+  });
+  client.on('error',()=>toast('⚠ Connection error'));
+  client.on('close',()=>{
     document.getElementById('dot').classList.remove('on');
-    document.getElementById('conn-text').textContent = 'reconnecting…';
-    setTimeout(connectWS, 2000);
-  };
-  ws.onerror = () => toast('⚠ Connection error');
+    document.getElementById('conn-text').textContent='reconnecting…';
+  });
 }
-
-function send(obj) {
-  obj.sender = 'phone';
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+function publish(obj){
+  if(client&&client.connected)
+    client.publish('browserremote/'+channel+'/cmd',JSON.stringify(obj),{qos:0});
 }
-
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
   });
 });
-
-// ── Action buttons ────────────────────────────────────────────────────────────
-document.querySelectorAll('[data-action]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const raw = btn.dataset.action;
-    let msg;
-    try {
-      msg = JSON.parse(raw);
-    } catch {
-      msg = { action: raw };
-    }
-    send(msg);
-    toast('▶ ' + (msg.action || raw));
+document.querySelectorAll('[data-action]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const raw=btn.dataset.action;
+    let msg;try{msg=JSON.parse(raw);}catch{msg={action:raw};}
+    publish(msg);toast('▶ '+(msg.action||raw));
   });
 });
-
-// ── Scroll pad ────────────────────────────────────────────────────────────────
-const scrollpad = document.getElementById('scrollpad');
-let scrollLastY = 0, scrollAccum = 0;
-scrollpad.addEventListener('touchstart', e => {
+const scrollpad=document.getElementById('scrollpad');
+let scrollLastY=0,scrollAccum=0;
+scrollpad.addEventListener('touchstart',e=>{e.preventDefault();scrollLastY=e.touches[0].clientY;scrollAccum=0;scrollpad.classList.add('active-scroll');},{passive:false});
+scrollpad.addEventListener('touchmove',e=>{
   e.preventDefault();
-  scrollLastY = e.touches[0].clientY;
-  scrollAccum = 0;
-  scrollpad.classList.add('active-scroll');
-}, { passive: false });
-scrollpad.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const dy = e.touches[0].clientY - scrollLastY;
-  scrollLastY = e.touches[0].clientY;
-  scrollAccum += dy;
-  if (Math.abs(scrollAccum) > 20) {
-    send({ action: scrollAccum < 0 ? 'scroll_down' : 'scroll_up', amount: Math.abs(scrollAccum) * 3 });
-    scrollAccum = 0;
+  const dy=e.touches[0].clientY-scrollLastY;
+  scrollLastY=e.touches[0].clientY;scrollAccum+=dy;
+  if(Math.abs(scrollAccum)>20){
+    publish({action:scrollAccum<0?'scroll_down':'scroll_up',amount:Math.abs(scrollAccum)*3});
+    scrollAccum=0;
   }
-}, { passive: false });
-scrollpad.addEventListener('touchend', () => scrollpad.classList.remove('active-scroll'));
-
-// ── Type text ─────────────────────────────────────────────────────────────────
-document.getElementById('type-send').addEventListener('click', () => {
-  const input = document.getElementById('type-input');
-  const text = input.value;
-  if (text) {
-    send({ action: 'type', text });
-    toast('📝 Sent: ' + text.slice(0, 20));
-    input.value = '';
-  }
+},{passive:false});
+scrollpad.addEventListener('touchend',()=>scrollpad.classList.remove('active-scroll'));
+document.getElementById('type-send').addEventListener('click',()=>{
+  const input=document.getElementById('type-input');
+  const text=input.value;
+  if(text){publish({action:'type',text});toast('📝 Sent: '+text.slice(0,20));input.value='';}
 });
-document.getElementById('type-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('type-send').click();
-});
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
+document.getElementById('type-input').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('type-send').click();});
 let toastTimer;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
 </script>
 </body>
